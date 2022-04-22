@@ -149,18 +149,18 @@ class Paylocity:
 
         def process_report(self):
             sleep(3)
-
-            reportmenuXpath = '//*[contains(@data-automation-id,"Reports-&-Analytics") and text()="Reports & Analytics"]'
-            reportmenu = WebDriverWait(self.driver, 30).until(EC.element_to_be_clickable((By.XPATH, reportmenuXpath)))
-            reportmenu.click()
-
-            reportingXpath = '//*[contains(@data-automation-id,"Reporting") and text()="Reporting"]'
-            reporting = WebDriverWait(self.driver, 30).until(EC.element_to_be_clickable((By.XPATH, reportingXpath)))
-            reporting.click()
-
-            searchXpath = '//*[contains(@class,"search-box") and contains(@placeholder,"Search by Name, Description, Label")]'
-
             for file in self.report_data:
+                reportmenuXpath = '//*[contains(@data-automation-id,"Reports-&-Analytics") and text()="Reports & Analytics"]'
+                reportmenu = WebDriverWait(self.driver, 30).until(EC.element_to_be_clickable((By.XPATH, reportmenuXpath)))
+                reportmenu.click()
+
+                reportingXpath = '//*[contains(@data-automation-id,"Reporting") and text()="Reporting"]'
+                reporting = WebDriverWait(self.driver, 30).until(EC.element_to_be_clickable((By.XPATH, reportingXpath)))
+                reporting.click()
+
+                searchXpath = '//*[contains(@class,"search-box") and contains(@placeholder,"Search by Name, Description, Label")]'
+
+
                 searchbox = WebDriverWait(self.driver, 30).until(EC.element_to_be_clickable((By.XPATH, searchXpath)))
                 searchbox.clear()
                 searchbox.send_keys(file[0])
@@ -203,7 +203,7 @@ class Paylocity:
                     runbtn = WebDriverWait(self.driver, 30).until(EC.element_to_be_clickable((By.XPATH, runXpath)))
                     if runbtn:
                         runbtn.click()
-                    gotoXpath = '//*[contains(@id,"GoToReportList")]'
+                    gotoXpath = '//*[text()="Go to Pickup"]'
                     gotobtn = WebDriverWait(self.driver, 30).until(EC.element_to_be_clickable((By.XPATH, gotoXpath)))
                     if gotobtn:
                         gotobtn.click()
@@ -213,46 +213,46 @@ class Paylocity:
                 else:
                     self.gui_queue.put({'status': f'Payroll report for {file[0]} not found'}) if self.gui_queue else None
                     return False
-            sleep(2)
-            reportpickupXpath = '//*[@data-automation-id="report-pickup-thumb"]'
-            reportpickup = WebDriverWait(self.driver, 60).until(EC.element_to_be_clickable((By.XPATH, reportpickupXpath)))
-            reportpickup.click()
-            sleep(5)
-            return True
-
-        def download_report(self):
-            sleep(5)
-            refreshXpath = '//*[@id="refreshButton"]'
-            refreshbtn = WebDriverWait(self.driver, 30).until(EC.element_to_be_clickable((By.XPATH, refreshXpath)))
-            refreshbtn.click()
-            sleep(3)
-
-            report_data = [report_data[0] for report_data in self.report_data]
-            for num in range(1,len(report_data)+1):
-                WebDriverWait(self.driver, 30).until(EC.element_to_be_clickable((By.XPATH, refreshXpath)))
-                sleep(1)
-                reportnameXpath = f'//*[@id="report-pickup-display"]/app-report-pickup-scroller/div/div[2]/div[1]/div/table/tbody/tr[{num}]/td[2]//h4/*'
+                sleep(2)
+                reportpickupXpath = '//*[@data-automation-id="report-pickup-thumb"]'
+                reportpickup = WebDriverWait(self.driver, 60).until(EC.element_to_be_clickable((By.XPATH, reportpickupXpath)))
+                reportpickup.click()
+                sleep(7)
+                try:
+                    refreshXpath = '//*[@id="refreshButton"]'
+                    refreshbtn = WebDriverWait(self.driver, 30).until(EC.element_to_be_clickable((By.XPATH, refreshXpath)))
+                    refreshbtn.click()
+                    sleep(3)
+                    downloadlink = None
+                    downloadlinkXpath = '//*[@data-automation-id="report-pickup-run-column-export"]//*[text()=" Pending "]'
+                    downloadlink = WebDriverWait(self.driver,10).until(EC.visibility_of_element_located((By.XPATH,downloadlinkXpath)))
+                    if str(downloadlink.text).strip().lower() == "pending":
+                        refreshbtn.click()
+                        sleep(2)
+                except:
+                    pass
+                reportnameXpath = f'//*[@id="report-pickup-display"]/app-report-pickup-scroller/div/div[2]/div[1]/div/table/tbody/tr[1]/td[2]//h4/*'
                 reportname = self.driver.find_element(By.XPATH, reportnameXpath)
                 # self.driver.execute_script('arguments[0].scrollIntoView();', reportname)
                 name = str(reportname.text).split('[')[0].strip()
                 sleep(0.5)
 
-                reportlinkXpath = f'//*[@id="report-pickup-display"]/app-report-pickup-scroller/div/div[2]/div[1]/div/table/tbody/tr[{num}]/td[6]//a'
-                reportlink = self.driver.find_element(By.XPATH,reportlinkXpath)
+                reportlinkXpath = f'//*[@id="report-pickup-display"]/app-report-pickup-scroller/div/div[2]/div[1]/div/table/tbody/tr[1]/td[6]//a'
+                reportlink = self.driver.find_element(By.XPATH, reportlinkXpath)
 
-                reportdateXpath = f'//*[@id="report-pickup-display"]/app-report-pickup-scroller/div/div[2]/div[1]/div/table/tbody/tr[{num}]/td[4]'
+                reportdateXpath = f'//*[@id="report-pickup-display"]/app-report-pickup-scroller/div/div[2]/div[1]/div/table/tbody/tr[1]/td[4]'
                 reportdate = self.driver.find_element(By.XPATH, reportdateXpath)
                 date_ = datetime.datetime.strptime(reportdate.text, "%m/%d/%y %I:%M %p").strftime("%m/%d/%Y")
 
-                reportgenXpath = f'//*[@id="report-pickup-display"]/app-report-pickup-scroller/div/div[2]/div[1]/div/table/tbody/tr[{num}]/td[3]'
+                reportgenXpath = f'//*[@id="report-pickup-display"]/app-report-pickup-scroller/div/div[2]/div[1]/div/table/tbody/tr[1]/td[3]'
                 reportgen = self.driver.find_element(By.XPATH, reportgenXpath)
                 sleep(0.5)
 
-                if name in report_data and date_ == datetime.date.today().strftime("%m/%d/%Y") and reportgen.text == 'Satish Patel':
+                if name in file[0] and date_ == datetime.date.today().strftime("%m/%d/%Y") and reportgen.text == 'Satish Patel':
                     reportlink.click()
                     sleep(2)
-            sleep(3)
             return True
+
 
         def logout(self):
             sleep(2)
@@ -314,12 +314,6 @@ class RunPay:
             if not report:
                 self.gui_queue.put({'status': f'\nError : Unable to Process Files.'}) if self.gui_queue else None
                 return False
-
-            download = paylo.download_report()
-            if not download:
-                if not report:
-                    self.gui_queue.put({'status': f'\nError : Unable to Download Files.'}) if self.gui_queue else None
-                    return False
 
             logout = paylo.logout()
             if not logout:
