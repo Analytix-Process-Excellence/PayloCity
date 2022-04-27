@@ -1,20 +1,12 @@
-import datetime
-import queue
-import re
-import time
-
+import queue, re, time, os, datetime
 from selenium.webdriver.support.ui import WebDriverWait,Select
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.action_chains import ActionChains
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from msedge.selenium_tools import Edge, EdgeOptions
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
 from openpyxl import load_workbook
 from time import sleep
-import datetime
-import os
-
+from datetime import timedelta
 
 class Paylocity:
         def __init__(self, gui_queue):
@@ -23,13 +15,11 @@ class Paylocity:
             self.report_data = None
             self.gui_queue = gui_queue
             self.login_url = r'https://access.paylocity.com/'
-            #self.logout_url = r'https://comptonbusinesssolutions.sharefile.com/Authentication/Login'
 
         def start_edge(self, download_pdf=True, download_prompt=False):
             self.downloadPath = os.path.join(os.getcwd(), 'Downloads','Paylocity',datetime.date.today().strftime("%m-%d-%Y"))
             if not os.path.isdir(self.downloadPath):
                 os.makedirs(self.downloadPath)
-
             self.existing_files = os.listdir(self.downloadPath)
             self.existing_files = []
 
@@ -147,7 +137,7 @@ class Paylocity:
                 print(str(e))
                 return False
 
-        def process_report(self):
+        def process_report(self,startdate,enddate):
             sleep(3)
             for file in self.report_data:
                 reportmenuXpath = '//*[contains(@data-automation-id,"Reports-&-Analytics") and text()="Reports & Analytics"]'
@@ -177,12 +167,18 @@ class Paylocity:
                         reporttype.select_by_visible_text(file[1])
                         sleep(0.5)
                         daterange.click()
+
                         fromdateXpath = '//*[@id="ctl00_WorkSpaceContent_reportFilterCntrl_stdDateParms_ddStartDateRange"]'
                         fromdate = Select(self.driver.find_element(By.XPATH,fromdateXpath))
 
                         sleep(0.5)
+                        startdate = datetime.datetime.strptime(startdate,"%m/%d/%Y") + timedelta(days=5)
+                        enddate = datetime.datetime.strptime(enddate,"%m/%d/%Y") + timedelta(days=5)
+                        startdate = f'{startdate} - {startdate.year}{startdate.month}{startdate.date}01'
+                        enddate = f'{enddate} - {enddate.year}{enddate.month}{enddate.date}01'
                         dateselectXpath = '//*[@id="ctl00_WorkSpaceContent_reportFilterCntrl_stdDateParms_ddStartDateRange"]/option[1]'
                         dateselect = self.driver.find_element(By.XPATH,dateselectXpath)
+                        # fromdate.select_by_visible_text(startdate)
                         fromdate.select_by_visible_text(dateselect.text)
 
                         sleep(0.5)
@@ -192,6 +188,7 @@ class Paylocity:
                         sleep(0.5)
                         dateselectXpath = '//*[@id="ctl00_WorkSpaceContent_reportFilterCntrl_stdDateParms_ddEndDateRange"]/option[1]'
                         dateselect = self.driver.find_element(By.XPATH, dateselectXpath)
+                        # todate.select_by_visible_text(enddate)
                         todate.select_by_visible_text(dateselect.text)
 
                         sleep(0.5)
@@ -279,7 +276,7 @@ class RunPay:
     def __init__(self):
         self.gui_queue = queue.Queue()
 
-    def run(self):
+    def run(self,startdate,enddate):
         start_time = time.perf_counter()
         setting = 'PaylocitySettingSheet.xlsx'
         setting_wb = load_workbook(setting, data_only=True, read_only=True)
@@ -292,8 +289,8 @@ class RunPay:
             paylo.username = str(row[1]).strip()
             paylo.password = str(row[2]).strip()
             paylo.coid = re.findall(r'\d+', paylo.company)
-            # paylo.start_date = start_date
-            # paylo.end_date = end_date
+            paylo.start_date = startdate
+            paylo.end_date = enddate
             paylo.setting_dict = setting_dict
 
             setting_ws = setting_wb['Files'].values
@@ -310,7 +307,7 @@ class RunPay:
                 self.gui_queue.put({'status': f'\nError : Unable to Login.'}) if self.gui_queue else None
                 return False
 
-            report = paylo.process_report()
+            report = paylo.process_report(startdate,enddate)
             if not report:
                 self.gui_queue.put({'status': f'\nError : Unable to Process Files.'}) if self.gui_queue else None
                 return False
