@@ -186,7 +186,11 @@ class Paylocity_Process:
         journalws.append(self.header)
         for key, value in self.xldata.items():
             if value != 0:
-                journalws.append([key[0],key[1],key[2],key[4],key[5],value,None,None,None])
+                journalws.append([key[0],key[1],key[3],key[4],key[5],value,None,None,None])
+        journalwb.save(filename)
+        for row in journalws.iter_rows(min_row=2, min_col=6, max_col=6):
+            for cell in row:
+                cell.number_format = f'#,##0.00'
         journalwb.save(filename)
         return True
 

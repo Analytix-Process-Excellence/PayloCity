@@ -1,4 +1,4 @@
-import queue, re, time, os, datetime
+import queue, re, time, os, datetime, shutil
 from selenium.webdriver.support.ui import WebDriverWait,Select
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
@@ -17,7 +17,7 @@ class Paylocity:
             self.login_url = r'https://access.paylocity.com/'
 
         def start_edge(self, download_pdf=True, download_prompt=False):
-            self.downloadPath = os.path.join(os.getcwd(), 'Downloads','Paylocity',datetime.date.today().strftime("%m-%d-%Y"))
+            self.downloadPath = os.path.join(os.getcwd(), 'Downloads','Paylocity')
             if not os.path.isdir(self.downloadPath):
                 os.makedirs(self.downloadPath)
             self.existing_files = os.listdir(self.downloadPath)
@@ -130,7 +130,6 @@ class Paylocity:
                     else:
                         self.gui_queue.put({'status': f'Company Id {coid} not found'}) if self.gui_queue else None
                         return False
-
                 return True
 
             except Exception as e:
@@ -139,6 +138,10 @@ class Paylocity:
 
         def process_report(self,startdate,enddate):
             sleep(3)
+            try:
+                enddate = datetime.datetime.strptime(enddate, "%m/%d/%Y") + timedelta(days=5)
+            except:
+                enddate = enddate + timedelta(days=5)
             for file in self.report_data:
                 reportmenuXpath = '//*[contains(@data-automation-id,"Reports-&-Analytics") and text()="Reports & Analytics"]'
                 reportmenu = WebDriverWait(self.driver, 30).until(EC.element_to_be_clickable((By.XPATH, reportmenuXpath)))
@@ -172,14 +175,14 @@ class Paylocity:
                         fromdate = Select(self.driver.find_element(By.XPATH,fromdateXpath))
 
                         sleep(0.5)
-                        startdate = datetime.datetime.strptime(startdate,"%m/%d/%Y") + timedelta(days=5)
-                        enddate = datetime.datetime.strptime(enddate,"%m/%d/%Y") + timedelta(days=5)
-                        startdate = f'{startdate} - {startdate.year}{startdate.month}{startdate.date}01'
-                        enddate = f'{enddate} - {enddate.year}{enddate.month}{enddate.date}01'
+                        # startdate = datetime.datetime.strptime(startdate,"%m/%d/%Y") + timedelta(days=5)
+
+                        # startdate = f'{startdate} - {startdate.year}{startdate.month}{startdate.date}01'
+                        end_date = str(f'{enddate.strftime("%m/%d/%Y")} - {enddate.year}{"{:02d}".format(enddate.month)}{enddate.day}01')
                         dateselectXpath = '//*[@id="ctl00_WorkSpaceContent_reportFilterCntrl_stdDateParms_ddStartDateRange"]/option[1]'
                         dateselect = self.driver.find_element(By.XPATH,dateselectXpath)
-                        # fromdate.select_by_visible_text(startdate)
-                        fromdate.select_by_visible_text(dateselect.text)
+                        fromdate.select_by_visible_text(end_date)
+                        # fromdate.select_by_visible_text(dateselect.text)
 
                         sleep(0.5)
                         todateXpath = '//*[@id="ctl00_WorkSpaceContent_reportFilterCntrl_stdDateParms_ddEndDateRange"]'
@@ -188,9 +191,8 @@ class Paylocity:
                         sleep(0.5)
                         dateselectXpath = '//*[@id="ctl00_WorkSpaceContent_reportFilterCntrl_stdDateParms_ddEndDateRange"]/option[1]'
                         dateselect = self.driver.find_element(By.XPATH, dateselectXpath)
-                        # todate.select_by_visible_text(enddate)
-                        todate.select_by_visible_text(dateselect.text)
-
+                        todate.select_by_visible_text(end_date)
+                        # todate.select_by_visible_text(dateselect.text)
                         sleep(0.5)
                     else:
                         self.gui_queue.put({'status': f'Date Range button not available for {file[0]}'}) if self.gui_queue else None
@@ -248,6 +250,21 @@ class Paylocity:
                 if name in file[0] and date_ == datetime.date.today().strftime("%m/%d/%Y") and reportgen.text == 'Satish Patel':
                     reportlink.click()
                     sleep(2)
+                    flag = True
+                    while flag:
+                        file_downloaded = os.listdir(self.downloadPath)
+                        file_1 = f'{file[0]}.{str(file[1]).lower()}'
+                        if file_1 in file_downloaded:
+                            flag = False
+            downloadPath = os.path.join(self.downloadPath,enddate.strftime("%m-%d-%Y"))
+            if not os.path.exists(downloadPath):
+                os.mkdir(downloadPath)
+            files = os.listdir(self.downloadPath)
+            for file in files:
+                if file.endswith('.pdf') or file.endswith('.csv'):
+                    srcpath = os.path.join(self.downloadPath, file)
+                    dest = os.path.join(downloadPath, file)
+                    shutil.move(srcpath, dest)
             return True
 
 
@@ -276,7 +293,7 @@ class RunPay:
     def __init__(self):
         self.gui_queue = queue.Queue()
 
-    def run(self,startdate,enddate):
+    def run(self,startdate,enddate,weekcount):
         start_time = time.perf_counter()
         setting = 'PaylocitySettingSheet.xlsx'
         setting_wb = load_workbook(setting, data_only=True, read_only=True)
@@ -306,12 +323,13 @@ class RunPay:
             if not login:
                 self.gui_queue.put({'status': f'\nError : Unable to Login.'}) if self.gui_queue else None
                 return False
-
-            report = paylo.process_report(startdate,enddate)
-            if not report:
-                self.gui_queue.put({'status': f'\nError : Unable to Process Files.'}) if self.gui_queue else None
-                return False
-
+            while startdate < enddate:
+                end_date = startdate + timedelta(days=6)
+                report = paylo.process_report(startdate.strftime("%m/%d/%Y"),end_date.strftime("%m/%d/%Y"))
+                if not report:
+                    self.gui_queue.put({'status': f'\nError : Unable to Process Files.'}) if self.gui_queue else None
+                    return False
+                startdate = startdate + timedelta(days=7)
             logout = paylo.logout()
             if not logout:
                 self.gui_queue.put({'status': f'\nError : Unable to Logout.'}) if self.gui_queue else None

@@ -1,3 +1,4 @@
+import calendar
 import datetime, os, threading, queue
 import PySimpleGUI as sg
 from Paylocity_Download import RunPay
@@ -7,10 +8,10 @@ sg.theme('DarkBlue3')
 gui_queue = queue.Queue()
 
 
-def download_pay(startdate,enddate):
+def download_pay(startdate,enddate,weekcount):
     pay = RunPay()
     pay.gui_queue = gui_queue
-    pay_status = pay.run(startdate,enddate)
+    pay_status = pay.run(startdate,enddate,weekcount)
     return pay_status
 
 def process_pay(filepath,startdate,enddate):
@@ -18,6 +19,19 @@ def process_pay(filepath,startdate,enddate):
     run.gui_queue = gui_queue
     run.run(filepath,startdate,enddate)
     return True
+
+def datecorrection(start_date,end_date,event):
+    startdate = datetime.datetime.strptime(start_date, "%m/%d/%Y")
+    enddate = datetime.datetime.strptime(end_date, "%m/%d/%Y")
+    weekcount = ((enddate - startdate).days + 1) / 7
+    startday = calendar.day_name[startdate.weekday()]
+    endday = calendar.day_name[enddate.weekday()]
+    if startday != 'Monday' or endday != 'Sunday':
+        return startdate, enddate, 0
+    if event == "report_download":
+        return startdate,enddate,weekcount
+    elif event == "prepare_report":
+        return startdate,enddate, weekcount
 
 def run_gui(thread=None):
     end_date = (datetime.date.today() - datetime.timedelta(days=1)).strftime('%m/%d/%Y')
@@ -72,23 +86,35 @@ def run_gui(thread=None):
             break
 
         elif event == 'report_download':
-            startdate = values['startdate']
-            enddate = values['enddate']
-            weekcount = enddate - startdate
+            startdate, enddate, weekcount = datecorrection(values['startdate'],values['enddate'],event)
+            try:
+                weekcount = int(weekcount)
+                if weekcount <= 0:
+                    window['status'].print('Please select week dates properly\n')
+                    continue
+            except:
+                window['status'].print('Please select week dates properly\n')
+                continue
             window['status'].print('Paylocity Report Download Processing...\n')
             window['report_download'].Update(disabled=True)
             window['prepare_report'].Update(disabled=True)
-            thread = threading.Thread(target=download_pay, args=(startdate,enddate))
+            thread = threading.Thread(target=download_pay, args=(startdate,enddate,weekcount))
             thread.start()
 
         elif event == 'prepare_report':
             filepath = values['filepath']
-            startdate = datetime.datetime.strptime(values['startdate'],"%m/%d/%Y")
-            enddate = datetime.datetime.strptime(values['enddate'],"%m/%d/%Y")
+            startdate, enddate, weekcount = datecorrection(values['startdate'],values['enddate'],event)
             if startdate > enddate:
                 window['status'].print('Start date cannot be greater then end date\n')
                 continue
-
+            try:
+                weekcount = int(weekcount)
+                if weekcount <= 0:
+                    window['status'].print('Please select week dates properly\n')
+                    continue
+            except:
+                window['status'].print('Please select week dates properly\n')
+                continue
             filelist = None
             if filepath:
                 filelist = os.listdir(filepath)
